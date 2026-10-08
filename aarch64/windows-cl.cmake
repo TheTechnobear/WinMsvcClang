@@ -1,5 +1,19 @@
 include_guard(GLOBAL)
 
+if (CMAKE_HOST_SYSTEM_NAME STREQUAL "Darwin")
+    set(LLVM_NATIVE_TOOLCHAIN "/opt/homebrew/opt/llvm")
+    set(LLD_LINK "/opt/homebrew/bin/lld-link")
+
+elseif (CMAKE_HOST_SYSTEM_NAME STREQUAL "Linux")
+    set(LLVM_NATIVE_TOOLCHAIN "/usr/lib/llvm-21")
+    set(LLD_LINK "${LLVM_NATIVE_TOOLCHAIN}/bin/lld-link")
+
+else()
+    message(FATAL_ERROR
+        "Unsupported host system: ${CMAKE_HOST_SYSTEM_NAME}")
+endif()
+
+
 set(CMAKE_SYSTEM_NAME Windows)
 set(CMAKE_SYSTEM_VERSION 10.0)
 set(CMAKE_SYSTEM_PROCESSOR AMD64)
@@ -7,8 +21,6 @@ set(CMAKE_SYSTEM_PROCESSOR AMD64)
 # ---------------------------------------------------------------------------
 # Toolchain locations
 # ---------------------------------------------------------------------------
-
-set(LLVM_NATIVE_TOOLCHAIN "/usr/lib/llvm-21")
 set(LLVM_WINSYSROOT "$ENV{HOME}/toolchains/win/aarch64")
 
 set(MSVC_VER "14.44.17.14")
@@ -33,10 +45,13 @@ set(WINSDK_LIB
 # Sanity checks
 # ---------------------------------------------------------------------------
 
-if(NOT EXISTS "${LLVM_NATIVE_TOOLCHAIN}/bin/clang-cl" OR
-   NOT EXISTS "${LLVM_NATIVE_TOOLCHAIN}/bin/lld-link")
+if(NOT EXISTS "${LLVM_NATIVE_TOOLCHAIN}/bin/clang-cl")
     message(FATAL_ERROR
-        "LLVM_NATIVE_TOOLCHAIN does not contain clang-cl/lld-link")
+        "LLVM clang-cl not found")
+endif()
+
+if(NOT EXISTS "${LLD_LINK}")
+    message(FATAL_ERROR "lld-link not found")
 endif()
 
 if(NOT EXISTS "${MSVC_INCLUDE}" OR NOT EXISTS "${MSVC_LIB}")
@@ -98,7 +113,7 @@ function(generate_winsdk_vfs_overlay winsdk_include_dir output_path)
             file(APPEND "${output_path}"
                  "        type: file\n")
             file(APPEND "${output_path}"
-                 "        external-contents: \"${dir}/${header}\"\n")
+                 "          external-contents: \"${dir}/${header}\"\n")
         endforeach()
     endforeach()
 endfunction()
@@ -185,11 +200,15 @@ set(CMAKE_CXX_COMPILER
     CACHE FILEPATH "")
 
 set(CMAKE_LINKER
-    "${LLVM_NATIVE_TOOLCHAIN}/bin/lld-link"
+    "${LLD_LINK}"
     CACHE FILEPATH "")
 
 set(CMAKE_AR
     "${LLVM_NATIVE_TOOLCHAIN}/bin/llvm-lib"
+    CACHE FILEPATH "")
+
+set(CMAKE_RC_COMPILER
+    "${LLVM_NATIVE_TOOLCHAIN}/bin/llvm-rc"
     CACHE FILEPATH "")
 
 # ---------------------------------------------------------------------------
@@ -254,9 +273,14 @@ set(CMAKE_RC_FLAGS_INIT
     "-fms-compatibility-version=19.28 "
     "-vctoolsversion ${MSVC_VER} "
     "-winsdkversion ${WINSDK_VER} "
-    "-winsysroot \"${LLVM_WINSYSROOT}\" "
-    "-Xclang -ivfsoverlay "
-    "-Xclang \"${winsdk_vfs_overlay_path}\"")
+    "-winsysroot \"${LLVM_WINSYSROOT}\"")
+
+if(case_sensitive_filesystem)
+    string(APPEND CMAKE_RC_FLAGS_INIT
+        " -Xclang -ivfsoverlay "
+        "-Xclang \"${winsdk_vfs_overlay_path}\"")
+endif()
+
 
 string(REPLACE ";" " " CMAKE_RC_FLAGS_INIT "${CMAKE_RC_FLAGS_INIT}")
 
@@ -329,6 +353,7 @@ string(APPEND CMAKE_SHARED_LINKER_FLAGS_INIT
 # Don't let try_compile configurations lose the important variables.
 list(APPEND CMAKE_TRY_COMPILE_PLATFORM_VARIABLES
     LLVM_NATIVE_TOOLCHAIN
+    LLD_LINK
     LLVM_WINSYSROOT
     MSVC_VER
     WINSDK_VER
