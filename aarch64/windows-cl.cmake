@@ -113,7 +113,7 @@ function(generate_winsdk_vfs_overlay winsdk_include_dir output_path)
             file(APPEND "${output_path}"
                  "        type: file\n")
             file(APPEND "${output_path}"
-                 "          external-contents: \"${dir}/${header}\"\n")
+                 "        external-contents: \"${dir}/${header}\"\n")
         endforeach()
     endforeach()
 endfunction()
@@ -296,7 +296,6 @@ string(APPEND CMAKE_CXX_FLAGS_INIT
 # ---------------------------------------------------------------------------
 
 set(LINK_FLAGS
-    /manifest:no
     -libpath:"${ATLMFC_LIB}/${WINSDK_ARCH}"
     -libpath:"${MSVC_LIB}/${WINSDK_ARCH}"
     -libpath:"${WINSDK_LIB}/ucrt/${WINSDK_ARCH}"
@@ -360,3 +359,4 @@ list(APPEND CMAKE_TRY_COMPILE_PLATFORM_VARIABLES
     winsdk_vfs_overlay_path
     msvc_lib_symlinks_dir
     winsdk_lib_symlinks_dir)
+    
